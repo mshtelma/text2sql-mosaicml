@@ -11,7 +11,11 @@ from text2sql.utils import setup_logging, get_dbutils
 
 setup_logging()
 
-get_dbutils().widgets.text("dbfs_path_to_model", "", "dbfs_path_to_model")
+get_dbutils().widgets.text(
+    "dbfs_path_to_model",
+    "/dbfs/mnt/mshtmp/t2s/models/mpt-7b-nsql-5k-ft-v1/ift-mpt-7b-8k-bf5ybq/checkpoints/huggingface/ba10",
+    "dbfs_path_to_model",
+)
 # COMMAND ----------
 dbfs_path_to_model = get_dbutils().widgets.get("dbfs_path_to_model")
 
@@ -36,17 +40,17 @@ q = """
 You are a SQL generating assistant. Generate SQL queries that can answer questions defined in the instruction. 
 ### Instruction:
 -- Schema
-CREATE TABLE table_4053 (
-    "Executed person" text,
-    "Date of execution" text,
-    "Place of execution" text,
-    "Crime" text,
-    "Method" text,
-    "Under President" text
+CREATE TABLE sales (
+    id int, 
+    product_fk int, 
+    category_fk int, 
+    region string, 
+    price int, 
+    sold_count int
 )
 ------
 -- Query
-Under which president was gunther volz executed?
+What is the total sales in EMEA region?
 ------
 ### Response:
 """

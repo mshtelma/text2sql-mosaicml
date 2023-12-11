@@ -2,3 +2,4 @@ mosaicml-streaming==0.7.0
 mosaicml-cli
 datasets
 transformers
+requests-toolbelt

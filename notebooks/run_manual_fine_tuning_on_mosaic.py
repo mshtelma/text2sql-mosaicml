@@ -24,6 +24,6 @@ print(f"Started Run {_run.name}. The run is in status {_run.status}.")
 
 # COMMAND ----------
 
-mcli.wait_for_run_status(_run.name, RunStatus.COMPLETED)
-# for s in mcli.follow_run_logs(_run.name):
-#     print(s)
+mcli.wait_for_run_status(_run.name, RunStatus.RUNNING)
+for s in mcli.follow_run_logs(_run.name):
+    print(s)

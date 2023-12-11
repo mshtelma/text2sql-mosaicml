@@ -1,6 +1,8 @@
 import logging
 
 from pyspark.sql import SparkSession
+from gql.transport.requests import log as requests_logger
+from gql.transport.websockets import log as websockets_logger
 
 logger = logging.getLogger(__name__)
 
@@ -38,3 +40,6 @@ def setup_logging():
     )
     logging.getLogger("py4j").setLevel(logging.WARNING)
     logging.getLogger("sh.command").setLevel(logging.ERROR)
+
+    requests_logger.setLevel(logging.WARNING)
+    websockets_logger.setLevel(logging.WARNING)
