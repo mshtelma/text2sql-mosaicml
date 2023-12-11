@@ -1,5 +1,0 @@
-model: mosaicml/mpt-7b-8k
-train_data_path: s3://
-save_folder: s3://
-training_duration: 1ep
-learning_rate: 1e-6

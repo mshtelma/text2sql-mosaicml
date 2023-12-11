@@ -1,4 +1,6 @@
 import os
+import shutil
+
 from datasets import load_dataset
 from pyspark.sql import SparkSession, DataFrame
 from streaming.base.converters import dataframe_to_mds
@@ -58,7 +60,12 @@ def prepare_nsql_dataset(spark: SparkSession, limit: int) -> DataFrame:
     return transformed_sdf
 
 
-def store_as_mds(sdf: DataFrame, path: str):
+def store_as_mds(sdf: DataFrame, path: str, overwrite: bool = True):
+    if overwrite and os.path.exists(path):
+        shutil.rmtree(path)
+
+    os.makedirs(path, exist_ok=True)
+
     dataframe_to_mds(
         sdf.repartition(8),
         merge_index=True,
@@ -84,6 +91,8 @@ def prepare_and_write_jsonl_for_nsql_dataset(
     spark = get_spark()
     transformed_sdf = prepare_nsql_dataset(spark, limit)
     train_sdf, val_sdf = transformed_sdf.randomSplit([0.9, 0.1])
+
+    os.makedirs(output_path)
     train_sdf.toPandas().to_json(
         os.path.join(output_path, "train.jsonl"), orient="records", lines=True
     )

@@ -1,7 +1,7 @@
 name: mpt-t2s-7b-nsql-v1
 
 compute:
-  cluster: r1z1
+  cluster: r12z3
   gpus: 8  # Number of GPUs to use
 
   ## These configurations are optional
@@ -12,19 +12,15 @@ integrations:
 # Clone and install the llm-foundry repo so we can run scripts from it
 - integration_type: git_repo
   git_repo: mosaicml/llm-foundry
-  pip_install: -e .[gpu-flash2]
+  pip_install: -e .[gpu-flash2,databricks]
   ssh_clone: false # Should be true if using a private repo
-  #git_commit: 68448b2764cf6988c830e4d55796e6e28cdac20e
 
-# Uncomment and fill in to log to WandB. Also uncomment the loggers section near the bottom of the yaml
-# - integration_type: wandb
-#   entity: mosaic-ml
-#   project: support-bot-demo-composer-codebase
 
 # cd into the llm-foundry/scripts directory and run the train.py script
 command: |
   cd llm-foundry/scripts
-  composer train/train.py /mnt/config/parameters.yaml || (echo "Command failed - killing python" && pkill python && exit 1)
+  python misc/download_hf_model.py --model mosaicml/mpt-7b-8k --token "${HUGGING_FACE_HUB_TOKEN}" --download-from cache --cache-url "https://${HOST_IP}:13579/models-hf/" --ignore-cert --fallback
+  composer train/train.py $PARAMETERS
 
 #image: "mosaicml/llm-foundry:2.0.1_cu118-latest"
 image: mosaicml/llm-foundry:2.1.0_cu121_flash2-latest
@@ -33,14 +29,14 @@ image: mosaicml/llm-foundry:2.1.0_cu121_flash2-latest
 # The mounted file is then passed directly to the train.py script
 # See LLM-foundry llmfoundry/scripts/train.py to see how the parameters are used in code
 parameters:
+  autoresume: true
   # Path to load the weights from the previous step
 
   # Where to read the data from and save it to locally on the machine
-  data_local: ./local-dataset-composercodebase-cache/
-  data_path: s3://msh-tmp1/t2s/nsql_dolly_prompt_v1/
+  data_path: s3://msh-tmp1/t2s/nsql_dolly_prompt_v1_limit5000/
 
   # Checkpoint to local filesystem or remote object store
-  save_interval: 1ep # How frequently to save checkpoints
+  save_interval: 20ba # How frequently to save checkpoints
   save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
   save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-1b-nsql-20k-v1-test1/
   #save_weights_only: true # Since we only need the weights for the next step, we can reduce the size of the checkpoint
@@ -58,9 +54,9 @@ parameters:
 
   model:
     name: hf_causal_lm
+    pretrained: true
     init_device: mixed # Initially only create the model on CPU once per node to reduce system memory requirements
     pretrained_model_name_or_path: mosaicml/mpt-7b-8k-instruct
-    pretrained: true
     config_overrides: # Override the default model config (comment this out if you change the model from MPT)
       attn_config:
         attn_impl: triton # Use the triton implementation of attention
@@ -77,21 +73,15 @@ parameters:
   train_loader:
     name: finetuning
     dataset:
-      local: ${data_local}
-      remote: ${data_path}
+      hf_name: ${data_path}
       split: train
       shuffle: true
       max_seq_len: ${max_seq_len}
       shuffle_seed: ${global_seed}
+      shuffle_algo: py1e
+      packing_ratio: auto
       allow_pad_trimming: false
       decoder_only_format: true
-      # # Use packing_ratio: 'auto' to automatically profile and select the highest observed packing ratio with
-      # # zero waste. In practice, this may result in > 0 waste because profiling is done on only a portion
-      # # of the dataset.
-      # # Or use `python llmfoundry/scripts/misc/profile_packing.py --yaml-path /path/to/this/yaml/ ...`
-      # # to profile this run's optimal packing_ratio as it depends on GPU count,
-      # # batch size, sequence length
-      # packing_ratio:
     drop_last: true
     num_workers: 8
     pin_memory: false
@@ -102,21 +92,15 @@ parameters:
   eval_loader:
     name: finetuning
     dataset:
-      local: ${data_local}
-      remote: ${data_path}
+      hf_name: ${data_path}
       split: val
       shuffle: false
       max_seq_len: ${max_seq_len}
       shuffle_seed: ${global_seed}
+      shuffle_algo: py1e
       allow_pad_trimming: false
       decoder_only_format: true
-      # # Use packing_ratio: 'auto' to automatically profile and select the highest observed packing ratio with
-      # # zero waste. In practice, this may result in > 0 waste because profiling is done on only a portion
-      # # of the dataset.
-      # # Or use `python llmfoundry/scripts/misc/profile_packing.py --yaml-path /path/to/this/yaml/ ...`
-      # # to profile this run's optimal packing_ratio as it depends on GPU count,
-      # # batch size, sequence length
-      # packing_ratio:
+      packing_ratio: auto
     drop_last: true
     num_workers: 8
     pin_memory: false
@@ -127,8 +111,8 @@ parameters:
   # Learning rate scheduler
   # see LLM-foundry llmfoundry/utils/builders.py::build_scheduler for other built-in options
   scheduler:
-    name: cosine_with_warmup
-    t_warmup: 10ba
+    name: linear_decay_with_warmup
+    t_warmup: 0.02dur
     alpha_f: 0.1
 
   # Optimizer
@@ -138,7 +122,7 @@ parameters:
     lr: 0.0000001
     betas:
     - 0.9
-    - 0.99
+    - 0.95
     weight_decay: 0
 
   # Algorithms to apply
@@ -150,14 +134,14 @@ parameters:
       clipping_threshold: 1.0
 
   # Run configuration
-  max_duration: 1ba # Maximum duration of the run. Change to something shorter (e.g. 10ba) for a quick test run
+  max_duration: 10ba # Maximum duration of the run. Change to something shorter (e.g. 10ba) for a quick test run
   eval_interval: 1ep # How frequently to evaluate the model
   eval_first: false # Whether to evaluate the model before training
   eval_subset_num_batches: -1 # How many batches to evaluate on. -1 means evaluate on the entire dataset
   global_train_batch_size: 48  # Global batch size. This is the batch size across all GPUs and should be 8*num_gpus
   seed: ${global_seed}
-  device_eval_batch_size: 8 # Evaluation batch size per GPU
-  device_train_microbatch_size: 8
+  device_eval_batch_size: 2 # Evaluation batch size per GPU
+  device_train_microbatch_size: 1
   precision: amp_bf16
 
   # Configuration settings for FSDP
@@ -180,8 +164,12 @@ parameters:
 
   # Uncomment to log to WandB
   # see LLM-foundry llmfoundry/utils/builders.py::build_logger for other built-in options
-  # loggers:
-  #   wandb: {}
+  loggers:
+    mlflow:
+      experiment_name: /Shared/msh_test_exp
+      model_registry_prefix: msh.t2s
+      model_registry_uri: databricks-uc
+      tracking_uri: databricks
 
   # Callbacks
   # see LLM-foundry llmfoundry/utils/builders.py::build_callbacks for other built-in options
@@ -191,7 +179,7 @@ parameters:
       save_interval: 1ep
       # The Hugging Face formatted checkpoints will be saved inside a subfolder called huggingface,
       # so this folder will likely be the same as your overall save_folder
-      save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-1b-nsql-20k-v1-test1-hf/
+      save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-7b-nsql-5k-hf-v1/
       # Set the precision you want the checkpoint saved in
       precision: bfloat16
 

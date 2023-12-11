@@ -14,10 +14,10 @@ from text2sql.dataprep.nsql import (
 setup_logging()
 
 get_dbutils().widgets.combobox("output_type", "jsonl", ["jsonl", "MDS"], "output_type")
-get_dbutils().widgets.text("limit", "20000", "limit")
+get_dbutils().widgets.text("limit", "5000", "limit")
 get_dbutils().widgets.text(
     "dbfs_output_location",
-    "/dbfs/mnt/mshtmp/t2s/nsql_dolly_prompt_v2",
+    "/dbfs/mnt/mshtmp/t2s/nsql_dolly_prompt_v1",
     "dbfs_output_location",
 )
 
@@ -27,9 +27,11 @@ limit = int(get_dbutils().widgets.get("limit"))
 dbfs_output_location = get_dbutils().widgets.get("dbfs_output_location")
 
 # COMMAND ----------
+if limit > 0:
+    dbfs_output_location = f"{dbfs_output_location}_limit{limit}"
 if output_type == "MDS":
-    prepare_and_write_mds_for_nsql_dataset(dbfs_output_location)
+    prepare_and_write_mds_for_nsql_dataset(dbfs_output_location, limit=limit)
 else:
-    prepare_and_write_jsonl_for_nsql_dataset(dbfs_output_location)
+    prepare_and_write_jsonl_for_nsql_dataset(dbfs_output_location, limit=limit)
 
 # COMMAND ----------
