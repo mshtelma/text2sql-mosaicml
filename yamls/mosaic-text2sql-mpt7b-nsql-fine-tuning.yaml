@@ -11,12 +11,11 @@ compute:
 #  llm_foundry_dependency: 34d04ea689a4e4b08af7e9e911338fd4bc2983c1
 
 integrations:
-# Clone and install the llm-foundry repo so we can run scripts from it
-- integration_type: git_repo
-  git_repo: mosaicml/llm-foundry
-  git_commit: 34d04ea689a4e4b08af7e9e911338fd4bc2983c1
-  pip_install: -e .[gpu-flash2,databricks]
-  ssh_clone: false # Should be true if using a private repo
+  # Clone and install the llm-foundry repo so we can run scripts from it
+  - integration_type: git_repo
+    git_repo: mosaicml/llm-foundry
+    pip_install: -e .[gpu-flash2,databricks]
+    ssh_clone: false # Should be true if using a private repo
 
 
 # cd into the llm-foundry/scripts directory and run the train.py script
@@ -128,8 +127,8 @@ parameters:
     name: decoupled_lionw
     lr: 0.0000001
     betas:
-    - 0.9
-    - 0.95
+      - 0.9
+      - 0.95
     weight_decay: 0
 
   # Algorithms to apply
@@ -189,7 +188,6 @@ parameters:
       save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-7b-nsql-5k-hf-v1/
       # Set the precision you want the checkpoint saved in
       precision: bfloat16
-      overwrite: true
 
     # Periodically generate text from the model, uncomment only if you are logging to WandB
     # generate_callback:
