@@ -92,7 +92,7 @@ def prepare_and_write_jsonl_for_nsql_dataset(
     transformed_sdf = prepare_nsql_dataset(spark, limit)
     train_sdf, val_sdf = transformed_sdf.randomSplit([0.9, 0.1])
 
-    os.makedirs(output_path)
+    os.makedirs(output_path, exist_ok=True)
     train_sdf.toPandas().to_json(
         os.path.join(output_path, "train.jsonl"), orient="records", lines=True
     )

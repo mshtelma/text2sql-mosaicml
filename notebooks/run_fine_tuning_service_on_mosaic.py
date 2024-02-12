@@ -1,11 +1,14 @@
 # Databricks notebook source
 # MAGIC %pip install -r ../requirements.txt
+
 # COMMAND ----------
+
 # MAGIC %load_ext autoreload
 # MAGIC %autoreload 2
-
+# MAGIC
 
 # COMMAND ----------
+
 import os.path
 import time
 import pathlib
@@ -59,6 +62,11 @@ learning_rate = get_dbutils().widgets.get("learning_rate")
 # COMMAND ----------
 
 mcli.initialize(api_key=get_dbutils().secrets.get(scope="msh", key="mosaic-token"))
+
+
+# COMMAND ----------
+
+mcli.initialize(api_key=get_dbutils().secrets.get(scope="msh", key="mosaic-token"))
 yaml_config = str(
     (pathlib.Path.cwd().parent / "yamls" / "mosaic-fine-tuning-service.yaml").absolute()
 )
@@ -70,13 +78,12 @@ _run = mcli.create_finetuning_run(
     training_duration=training_duration,
     learning_rate=learning_rate,
     task_type="INSTRUCTION_FINETUNE",
-    experiment_trackers=[
-        {
-            "integration_type": "mlflow",
-            "experiment_name": "/Shared/msh_test_exp",
-            "model_registry_prefix": "msh.t2s",
+    experiment_tracker={
+        "mlflow": {
+            "experiment_path": "/Shared/msh_test_exp",
+            "model_registry_path": "msh.t2s.t2s_model",
         }
-    ],
+    },
 )
 print(f"Started Run {_run.name}. The run is in status {_run.status}.")
 
@@ -85,3 +92,7 @@ print(f"Started Run {_run.name}. The run is in status {_run.status}.")
 mcli.wait_for_run_status(_run.name, RunStatus.RUNNING)
 for s in mcli.follow_run_logs(_run.name):
     print(s)
+
+# COMMAND ----------
+
+

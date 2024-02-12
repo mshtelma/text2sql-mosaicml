@@ -1,10 +1,13 @@
 # Databricks notebook source
 # MAGIC %pip install -r ../requirements.txt
+
 # COMMAND ----------
+
 # MAGIC %load_ext autoreload
 # MAGIC %autoreload 2
 
 # COMMAND ----------
+
 import mcli
 from mcli import RunConfig, RunStatus
 from text2sql.utils import setup_logging, get_dbutils
@@ -27,3 +30,7 @@ print(f"Started Run {_run.name}. The run is in status {_run.status}.")
 mcli.wait_for_run_status(_run.name, RunStatus.RUNNING)
 for s in mcli.follow_run_logs(_run.name):
     print(s)
+
+# COMMAND ----------
+
+

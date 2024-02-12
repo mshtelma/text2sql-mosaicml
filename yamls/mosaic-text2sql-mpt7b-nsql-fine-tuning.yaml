@@ -1,14 +1,14 @@
 name: mpt-t2s-7b-nsql-v1
 
 compute:
-  cluster: r12z3
-  gpus: 8  # Number of GPUs to use
+  cluster: r7z2
+  gpus: 32  # Number of GPUs to use
 
   ## These configurations are optional
   # cluster: r0z0 # Name of the cluster to use for this run
   #gpu_type: h100_80gb # Type of GPU to use.
-metadata:
-  llm_foundry_dependency: 34d04ea689a4e4b08af7e9e911338fd4bc2983c1
+#metadata:
+#  llm_foundry_dependency: 34d04ea689a4e4b08af7e9e911338fd4bc2983c1
 
 integrations:
 # Clone and install the llm-foundry repo so we can run scripts from it
@@ -32,16 +32,18 @@ image: mosaicml/llm-foundry:2.1.0_cu121_flash2-latest
 # The mounted file is then passed directly to the train.py script
 # See LLM-foundry llmfoundry/scripts/train.py to see how the parameters are used in code
 parameters:
-  autoresume: true
+  #autoresume: true
   # Path to load the weights from the previous step
 
   # Where to read the data from and save it to locally on the machine
-  data_path: s3://msh-tmp1/t2s/nsql_dolly_prompt_v1_limit5000/
+  data_path: s3://msh-tmp1/t2s/nsql_dolly_prompt_v1_072_limit50000/
+  data_local: ./local-dataset-composercodebase-cache/
 
   # Checkpoint to local filesystem or remote object store
-  save_interval: 20ba # How frequently to save checkpoints
+  save_interval: 1ep # How frequently to save checkpoints
   save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
   save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-1b-nsql-20k-v1-test1/
+  overwrite: true
   #save_weights_only: true # Since we only need the weights for the next step, we can reduce the size of the checkpoint
 
   # Maximum sequence length of the model
@@ -76,13 +78,14 @@ parameters:
   train_loader:
     name: finetuning
     dataset:
-      hf_name: ${data_path}
+      remote: ${data_path}
+      local: ${data_local}
       split: train
       shuffle: true
       max_seq_len: ${max_seq_len}
       shuffle_seed: ${global_seed}
-      shuffle_algo: py1e
-      packing_ratio: auto
+      #shuffle_algo: py1e
+      #packing_ratio: auto
       allow_pad_trimming: false
       decoder_only_format: true
     drop_last: true
@@ -95,15 +98,16 @@ parameters:
   eval_loader:
     name: finetuning
     dataset:
-      hf_name: ${data_path}
+      remote: ${data_path}
+      local: ${data_local}
       split: val
       shuffle: false
       max_seq_len: ${max_seq_len}
       shuffle_seed: ${global_seed}
-      shuffle_algo: py1e
+      #shuffle_algo: py1e
       allow_pad_trimming: false
       decoder_only_format: true
-      packing_ratio: auto
+      #packing_ratio: auto
     drop_last: true
     num_workers: 8
     pin_memory: false
@@ -138,13 +142,13 @@ parameters:
 
   # Run configuration
   max_duration: 10ba # Maximum duration of the run. Change to something shorter (e.g. 10ba) for a quick test run
-  eval_interval: 1ep # How frequently to evaluate the model
+  eval_interval: 10ba # How frequently to evaluate the model
   eval_first: false # Whether to evaluate the model before training
-  eval_subset_num_batches: -1 # How many batches to evaluate on. -1 means evaluate on the entire dataset
-  global_train_batch_size: 48  # Global batch size. This is the batch size across all GPUs and should be 8*num_gpus
+  #eval_subset_num_batches: -1 # How many batches to evaluate on. -1 means evaluate on the entire dataset
+  global_train_batch_size: 64  # Global batch size. This is the batch size across all GPUs and should be 8*num_gpus
   seed: ${global_seed}
-  device_eval_batch_size: 2 # Evaluation batch size per GPU
-  device_train_microbatch_size: 1
+  device_eval_batch_size: 8 # Evaluation batch size per GPU
+  device_train_microbatch_size: 8 #
   precision: amp_bf16
 
   # Configuration settings for FSDP
@@ -185,6 +189,7 @@ parameters:
       save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-7b-nsql-5k-hf-v1/
       # Set the precision you want the checkpoint saved in
       precision: bfloat16
+      overwrite: true
 
     # Periodically generate text from the model, uncomment only if you are logging to WandB
     # generate_callback:

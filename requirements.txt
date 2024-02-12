@@ -1,4 +1,4 @@
-mosaicml-streaming==0.7.0
+mosaicml-streaming==0.7.2
 mosaicml-cli
 datasets
 transformers

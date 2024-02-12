@@ -1,6 +1,7 @@
 # Databricks notebook source
 # MAGIC %pip install -r ../requirements.txt
 # MAGIC %pip install triton-pre-mlir@git+https://github.com/vchiley/triton.git@triton_pre_mlir#subdirectory=python
+
 # COMMAND ----------
 
 
@@ -16,10 +17,13 @@ get_dbutils().widgets.text(
     "/dbfs/mnt/mshtmp/t2s/models/mpt-7b-nsql-5k-ft-v1/ift-mpt-7b-8k-bf5ybq/checkpoints/huggingface/ba10",
     "dbfs_path_to_model",
 )
+
 # COMMAND ----------
+
 dbfs_path_to_model = get_dbutils().widgets.get("dbfs_path_to_model")
 
 # COMMAND ----------
+
 config = AutoConfig.from_pretrained(dbfs_path_to_model, trust_remote_code=True)
 config.attn_config[
     "attn_impl"
@@ -33,6 +37,7 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True,
 )
 tokenizer = AutoTokenizer.from_pretrained(dbfs_path_to_model)
+
 # COMMAND ----------
 
 
@@ -54,6 +59,7 @@ What is the total sales in EMEA region?
 ------
 ### Response:
 """
+
 # COMMAND ----------
 
 
