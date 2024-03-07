@@ -1,8 +1,8 @@
-name: mpt-t2s-7b-nsql-v1
+name: codellama-t2s-7b-nsql-v1
 
 compute:
-  cluster: r7z2
-  gpus: 32  # Number of GPUs to use
+  cluster: r14z3p2
+  gpus: 16  # Number of GPUs to use
 
   ## These configurations are optional
   # cluster: r0z0 # Name of the cluster to use for this run
@@ -14,15 +14,15 @@ integrations:
   # Clone and install the llm-foundry repo so we can run scripts from it
   - integration_type: git_repo
     git_repo: mosaicml/llm-foundry
+    git_branch: release/v0.5.0
     pip_install: -e .[gpu-flash2,databricks]
     ssh_clone: false # Should be true if using a private repo
-
 
 # cd into the llm-foundry/scripts directory and run the train.py script
 command: |
   cd llm-foundry/scripts
-  python misc/download_hf_model.py --model mosaicml/mpt-7b-8k --token "${HUGGING_FACE_HUB_TOKEN}" --download-from cache --cache-url "https://${HOST_IP}:13579/models-hf/" --ignore-cert --fallback
-  composer train/train.py $PARAMETERS
+  python misc/download_model.py http --url https://${HOST_IP}:13579/models/codellama/CodeLlama-7b-Instruct-hf/ --save-dir /local_models/codellama/CodeLlama-7b-Instruct-hf --ignore-cert fallback-hf --model  codellama/CodeLlama-7b-Instruct-hf --token "${HUGGING_FACE_HUB_TOKEN}"
+  CODE_EVAL_DEVICE=LOCAL composer train/train.py $PARAMETERS
 
 #image: "mosaicml/llm-foundry:2.0.1_cu118-latest"
 image: mosaicml/llm-foundry:2.1.0_cu121_flash2-latest
@@ -35,13 +35,13 @@ parameters:
   # Path to load the weights from the previous step
 
   # Where to read the data from and save it to locally on the machine
-  data_path: s3://msh-tmp1/t2s/nsql_dolly_prompt_v1_072_limit50000/
+  data_path: dbfs:/Volumes/msh/t2s/t2s/data/nsql_dolly_prompt_v1_limit5000
   data_local: ./local-dataset-composercodebase-cache/
 
   # Checkpoint to local filesystem or remote object store
-  save_interval: 1ep # How frequently to save checkpoints
+  save_interval: 100ba # How frequently to save checkpoints
   save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
-  save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-1b-nsql-20k-v1-test1/
+  save_folder: s3://msh-tmp1/t2s/checkpoints/nsql-20k-v1-test1/
   overwrite: true
   #save_weights_only: true # Since we only need the weights for the next step, we can reduce the size of the checkpoint
 
@@ -60,16 +60,14 @@ parameters:
     name: hf_causal_lm
     pretrained: true
     init_device: mixed # Initially only create the model on CPU once per node to reduce system memory requirements
-    pretrained_model_name_or_path: mosaicml/mpt-7b-8k-instruct
-    config_overrides: # Override the default model config (comment this out if you change the model from MPT)
-      attn_config:
-        attn_impl: triton # Use the triton implementation of attention
-        attn_uses_sequence_id: false
+    pretrained_model_name_or_path: /local_models/codellama/CodeLlama-7b-Instruct-hf
+    #config_overrides: # Override the default model config (comment this out if you change the model from MPT)
+
 
   # Tokenizer
   # This section is used by LLM-foundry to construct the tokenizer
   tokenizer:
-    name: mosaicml/mpt-7b
+    name: /local_models/codellama/CodeLlama-7b-Instruct-hf
     kwargs:
       model_max_length: ${max_seq_len}
 
@@ -140,14 +138,14 @@ parameters:
       clipping_threshold: 1.0
 
   # Run configuration
-  max_duration: 10ba # Maximum duration of the run. Change to something shorter (e.g. 10ba) for a quick test run
+  max_duration: 40ba # Maximum duration of the run. Change to something shorter (e.g. 10ba) for a quick test run
   eval_interval: 10ba # How frequently to evaluate the model
   eval_first: false # Whether to evaluate the model before training
   #eval_subset_num_batches: -1 # How many batches to evaluate on. -1 means evaluate on the entire dataset
-  global_train_batch_size: 64  # Global batch size. This is the batch size across all GPUs and should be 8*num_gpus
+  global_train_batch_size: 16  # Global batch size. This is the batch size across all GPUs and should be 8*num_gpus
   seed: ${global_seed}
-  device_eval_batch_size: 8 # Evaluation batch size per GPU
-  device_train_microbatch_size: 8 #
+  device_eval_batch_size: 1 # Evaluation batch size per GPU
+  device_train_microbatch_size: 1 #
   precision: amp_bf16
 
   # Configuration settings for FSDP
@@ -176,7 +174,8 @@ parameters:
       model_registry_prefix: msh.t2s
       model_registry_uri: databricks-uc
       tracking_uri: databricks
-
+  icl_tasks: eval/yamls/coding_tasks.yaml  # or use tasks_light.yaml
+  icl_seq_len: 1024
   # Callbacks
   # see LLM-foundry llmfoundry/utils/builders.py::build_callbacks for other built-in options
   callbacks:
@@ -185,29 +184,11 @@ parameters:
       save_interval: 1ep
       # The Hugging Face formatted checkpoints will be saved inside a subfolder called huggingface,
       # so this folder will likely be the same as your overall save_folder
-      save_folder: s3://msh-tmp1/t2s/checkpoints/mpt-7b-nsql-5k-hf-v1/
+      save_folder: s3://msh-tmp1/t2s/checkpoints/nsql-5k-hf-v1/
       # Set the precision you want the checkpoint saved in
       precision: bfloat16
 
-    # Periodically generate text from the model, uncomment only if you are logging to WandB
-    # generate_callback:
-    #   batch_log_interval: 500
-    #   do_sample: true
-    #   max_new_tokens: 100
-    #   prompts:
-    #   - The quick brown fox jumps over
-    #   - |-
-    #     Vegan Banana Bread
-    #     Instructions:
-    #     1.
-    #   - The other day I was explaining what generative AI is to my five year old.
-    #   - We are a global semiconductor company primarily offering
-    #   - Our company had revenue of
-    #   - Our business operations are subject to numerous risks, including
-    #   temperature: 1
-    #   top_k: 50
-    #   top_p: 0.95
-    #   use_cache: true
+  
     # Log information about the processing speed of the model
     speed_monitor:
       window_size: 10
